@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparar Planilhas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Comparar Planilhas</h1>
+
+    <input type="file" id="file1" accept=".xlsx, .csv">
+    <input type="file" id="file2" accept=".xlsx, .csv">
+    <button onclick="compareColumns()">Comparar</button>
+
+    <pre id="result"></pre>
+
+    <script>
+        let sheet1Data, sheet2Data;
+        let fileName1, fileName2;
+
+        // Função para carregar as planilhas
+        document.getElementById('file1').addEventListener('change', (e) => loadSheet(e, 1));
+        document.getElementById('file2').addEventListener('change', (e) => loadSheet(e, 2));
+
+        function loadSheet(event, sheetNumber) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+
+            if (sheetNumber === 1) {
+                fileName1 = file.name; // Capturar o nome do arquivo da planilha 1
+            } else {
+                fileName2 = file.name; // Capturar o nome do arquivo da planilha 2
+            }
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0]; // Carregar a primeira planilha
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                if (sheetNumber === 1) {
+                    sheet1Data = jsonData;
+                } else {
+                    sheet2Data = jsonData;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Função para comparar as colunas D
+        function compareColumns() {
+            if (!sheet1Data || !sheet2Data) {
+                alert('Por favor, carregue ambas as planilhas.');
+                return;
+            }
+
+            // Comparar a coluna D (índice 3)
+            const column1D = sheet1Data.map(row => row[3]); // Coluna D da planilha 1
+            const column2D = sheet2Data.map(row => row[3]); // Coluna D da planilha 2
+
+            const repeatedItems = [];
+            const uniqueItems = [];
+
+            // Encontrar itens que se repetem na coluna D de ambas as planilhas
+            column1D.forEach((item, index) => {
+                if (column2D.includes(item)) {
+                    repeatedItems.push([item, 'Confirmada']); // Itens repetidos e "Confirmada"
+                } else {
+                    uniqueItems.push([item, `Somente no arquivo ${fileName1}`]); // Itens apenas na Planilha 1
+                }
+            });
+
+            column2D.forEach((item, index) => {
+                if (!column1D.includes(item)) {
+                    uniqueItems.push([item, `Somente no arquivo ${fileName2}`]); // Itens apenas na Planilha 2
+                }
+            });
+
+            if (repeatedItems.length === 0 && uniqueItems.length === 0) {
+                document.getElementById('result').textContent = 'Nenhum item foi encontrado nas colunas D.';
+            } else {
+                // Combinar itens repetidos e únicos em uma única lista
+                const finalList = [['Item (Coluna C)', 'Status (Coluna D)']].concat(repeatedItems, uniqueItems);
+                
+                // Gerar nova planilha com os itens repetidos e únicos
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(finalList);
+
+                XLSX.utils.book_append_sheet(wb, ws, 'Resultado');
+                XLSX.writeFile(wb, 'Itens_Repetidos_Unicos.xlsx');
+            }
+        }
+    </script>
+</body>
+</html>
